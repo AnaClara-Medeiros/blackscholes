@@ -92,6 +92,105 @@ def calcular_break_even(payoff_dict):
 
     return break_evens
 
+def identificar_estrutura(legs):
+    """
+    Identifica estruturas de opções clássicas com base nos legs fornecidos.
+
+    Args:
+        legs (list[dict]): Cada leg contém:
+            - tipo: "call" ou "put"
+            - strike: preço de exercício
+            - sentido: "C" (compra) ou "V" (venda)
+
+    Returns:
+        str: Nome da estrutura ou "Estrutura não reconhecida"
+    """
+
+    calls = [l for l in legs if l["tipo"] == "call"]
+    puts = [l for l in legs if l["tipo"] == "put"]
+
+    n_calls = len(calls)
+    n_puts = len(puts)
+
+    # ---------- STRADDLE ----------
+    if n_calls == 1 and n_puts == 1 and calls[0]["strike"] == puts[0]["strike"]:
+        return "Straddle"
+
+    # ---------- STRANGLE ----------
+    if n_calls == 1 and n_puts == 1 and calls[0]["strike"] != puts[0]["strike"]:
+        return "Strangle"
+
+    # ---------- BULL/BEAR CALL SPREAD ----------
+    if n_calls == 2 and n_puts == 0:
+        sorted_calls = sorted(calls, key=lambda x: x["strike"])
+        low, high = sorted_calls[0], sorted_calls[1]
+        if low["sentido"] == "C" and high["sentido"] == "V":
+            return "Bull Call Spread"
+        elif low["sentido"] == "V" and high["sentido"] == "C":
+            return "Bear Call Spread"
+
+    # ---------- BULL/BEAR PUT SPREAD ----------
+    if n_puts == 2 and n_calls == 0:
+        sorted_puts = sorted(puts, key=lambda x: x["strike"])
+        low, high = sorted_puts[0], sorted_puts[1]
+        if low["sentido"] == "V" and high["sentido"] == "C":
+            return "Bull Put Spread"
+        elif low["sentido"] == "C" and high["sentido"] == "V":
+            return "Bear Put Spread"
+
+    # ---------- BUTTERFLY (CALL ou PUT) ----------
+    if n_calls == 3 and n_puts == 0:
+        strikes = sorted([c["strike"] for c in calls])
+        if strikes[2] - strikes[1] == strikes[1] - strikes[0]:
+            return "Butterfly (Call)"
+    if n_puts == 3 and n_calls == 0:
+        strikes = sorted([p["strike"] for p in puts])
+        if strikes[2] - strikes[1] == strikes[1] - strikes[0]:
+            return "Butterfly (Put)"
+
+    # ---------- IRON BUTTERFLY ----------
+    if n_calls == 2 and n_puts == 2:
+        strikes_calls = sorted([c["strike"] for c in calls])
+        strikes_puts = sorted([p["strike"] for p in puts])
+        if strikes_calls[0] == strikes_puts[1] and strikes_calls[1] == strikes_puts[0]:
+            return "Iron Butterfly"
+
+    # ---------- IRON CONDOR ----------
+    if n_calls == 2 and n_puts == 2:
+        strikes_calls = sorted([c["strike"] for c in calls])
+        strikes_puts = sorted([p["strike"] for p in puts])
+        # Iron condor: put spread + call spread (simétricos ou não)
+        if strikes_calls[0] > strikes_puts[1]:
+            return "Iron Condor"
+
+    return "Estrutura não reconhecida"
+
+def calcular_estrutura_api(legs, S_range):
+    """
+    Gera saída completa para API com nome da estrutura,
+    payoff, break-evens e custo inicial.
+    """
+
+    # Nome da estrutura (ou 'não reconhecida')
+    nome = identificar_estrutura(legs)
+
+    # Calcula payoff e pontos de break-even
+    payoff_dict = payoff_com_premio(legs, S_range)
+    break_evens = calcular_break_even(payoff_dict)
+
+    # Custo inicial é a diferença entre payoff inicial e payoff bruto
+    custo_inicial = sum(
+        leg["premio"] * (1 if leg["sentido"] == "C" else -1) * leg.get("qtd", 1)
+        for leg in legs
+    )
+
+    # Monta resposta
+    return {
+        "estrutura": nome,
+        "custo_inicial": round(custo_inicial, 2),
+        "payoff": {float(k): round(v, 2) for k, v in payoff_dict.items()},
+        "break_evens": break_evens,
+    }
 
 def plot_payoff(payoff_dict, break_evens=None, titulo="Payoff da Estrutura"):
     """
