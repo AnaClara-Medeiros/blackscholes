@@ -126,6 +126,32 @@ def identificar_estrutura(legs):
 
     return "Estrutura não reconhecida"
 
+def calcular_estrutura_api(legs, S_range):
+    """
+    Gera saída completa para API com nome da estrutura,
+    payoff, break-evens e custo inicial.
+    """
+
+    # Nome da estrutura (ou 'não reconhecida')
+    nome = identificar_estrutura(legs)
+
+    # Calcula payoff e pontos de break-even
+    payoff_dict = payoff_com_premio(legs, S_range)
+    break_evens = calcular_break_even(payoff_dict)
+
+    # Custo inicial é a diferença entre payoff inicial e payoff bruto
+    custo_inicial = sum(
+        leg["premio"] * (1 if leg["sentido"] == "C" else -1) * leg.get("qtd", 1)
+        for leg in legs
+    )
+
+    # Monta resposta
+    return {
+        "estrutura": nome,
+        "custo_inicial": round(custo_inicial, 2),
+        "payoff": {float(k): round(v, 2) for k, v in payoff_dict.items()},
+        "break_evens": break_evens,
+    }
 
 
 def plot_payoff(payoff_dict, break_evens=None, titulo="Payoff da Estrutura"):
