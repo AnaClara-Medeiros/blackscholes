@@ -92,6 +92,41 @@ def calcular_break_even(payoff_dict):
 
     return break_evens
 
+def identificar_estrutura(legs):
+    calls = [l for l in legs if l["tipo"] == "call"]
+    puts = [l for l in legs if l["tipo"] == "put"]
+    compras = [l for l in legs if l["sentido"] == "C"]
+    vendas = [l for l in legs if l["sentido"] == "V"]
+
+    n_calls = len(calls)
+    n_puts = len(puts)
+    n_compras = len(compras)
+    n_vendas = len(vendas)
+
+    # Exemplo: Butterfly clássica
+    if n_calls == 3 and n_puts == 0:
+        strikes = sorted([l["strike"] for l in calls])
+        if strikes[2] - strikes[1] == strikes[1] - strikes[0]:
+            return "Butterfly (Call)"
+
+    # Exemplo: Straddle
+    if n_calls == 1 and n_puts == 1 and all(l["strike"] == calls[0]["strike"] for l in puts):
+        return "Straddle"
+
+    # Exemplo: Iron Condor
+    if n_calls == 2 and n_puts == 2:
+        strikes_calls = sorted([l["strike"] for l in calls])
+        strikes_puts = sorted([l["strike"] for l in puts])
+        if strikes_calls[1] - strikes_calls[0] == strikes_puts[1] - strikes_puts[0]:
+            return "Iron Condor"
+
+    # Exemplo: Strangle
+    if n_calls == 1 and n_puts == 1 and calls[0]["strike"] != puts[0]["strike"]:
+        return "Strangle"
+
+    return "Estrutura não reconhecida"
+
+
 
 def plot_payoff(payoff_dict, break_evens=None, titulo="Payoff da Estrutura"):
     """
