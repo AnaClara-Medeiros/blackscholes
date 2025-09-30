@@ -68,65 +68,66 @@ def payoff_com_premio(legs, S_range):
 
 def payoff_com_premio_new(legs, S_range):
     """
-    Calcula o payoff líquido de uma estrutura de opções usando prêmios já conhecidos.
-    Agora inclui também o ativo adjacente tratado como um leg.
+    Args:
+        legs: lista de dicionários com as pernas, ex:
+            {"tipo": "ativo", "ativo_adjacente": 100, "sentido": "C", "qtd": 1}
+            {"tipo": "put", "strike": 100, "premio": 10, "sentido": "C", "qtd": 1}
+            {"tipo": "call", "strike": 110, "premio": 10, "sentido": "V", "qtd": 1}
+        S_range: lista de preços do ativo no vencimento (ex: range(70, 140, 5))
+
+    Returns:
+        payoff_dict: {S: payoff_total} para cada preço final
+        custo_inicial: prêmio líquido (ΔP)
     """
     payoff_dict = {}
-    custo_inicial = 0
+    custo_inicial = 0  # soma dos prêmios (Pc - Pp)
 
-    # custo inicial = prêmios pagos/recebidos (opções + ativo)
+    # custo inicial líquido: somatório dos prêmios
     for leg in legs:
         qtd = leg.get("qtd", 1)
-        sentido = leg["sentido"]
-
+        premio = leg.get("premio", 0)
         if leg["tipo"] in ("call", "put"):
-            premio = leg["premio"]
-            if sentido == "C":
-                custo_inicial += premio * qtd
-            elif sentido == "V":
-                custo_inicial -= premio * qtd
+            if leg["sentido"] == "C":
+                custo_inicial -= premio * qtd   # pagou prêmio
+            elif leg["sentido"] == "V":
+                custo_inicial += premio * qtd   # recebeu prêmio
 
-        elif leg["tipo"] == "ativo":
-            # ativo pode ter prêmio inicial (se existir custo de carregar, ex: ajuste futuro)
-            premio = leg.get("premio", 0)
-            if sentido == "C":
-                custo_inicial += premio * qtd
-            elif sentido == "V":
-                custo_inicial -= premio * qtd
-
-    # payoff para cada preço final
-    for S_final in S_range:
+    # payoff em cada preço S no vencimento
+    for S in S_range:
         payoff_total = 0
 
         for leg in legs:
             qtd = leg.get("qtd", 1)
+            tipo = leg["tipo"]
             sentido = leg["sentido"]
 
-            if leg["tipo"] == "call":
-                payoff_leg = max(S_final - leg["strike"], 0) * qtd
-                if sentido == "V":
-                    payoff_leg = -payoff_leg
-
-            elif leg["tipo"] == "put":
-                payoff_leg = max(leg["strike"] - S_final, 0) * qtd
-                if sentido == "V":
-                    payoff_leg = -payoff_leg
-
-            elif leg["tipo"] == "ativo":
+            if tipo == "ativo":
                 S0 = leg["ativo_adjacente"]
-                payoff_leg = (S_final - S0) * qtd
+                payoff_leg = (S - S0) * qtd
                 if sentido == "V":
+                    payoff_leg = -payoff_leg
+
+            elif tipo == "put":
+                strike = leg["strike"]
+                payoff_leg = max(strike - S, 0) * qtd
+                if sentido == "V":  # vendido
+                    payoff_leg = -payoff_leg
+
+            elif tipo == "call":
+                strike = leg["strike"]
+                payoff_leg = -max(S - strike, 0) * qtd
+                if sentido == "C":  # comprado
                     payoff_leg = -payoff_leg
 
             else:
-                raise ValueError("Tipo deve ser 'call', 'put' ou 'ativo'")
+                raise ValueError("Tipo deve ser 'ativo', 'put' ou 'call'")
 
             payoff_total += payoff_leg
 
-        payoff_dict[S_final] = payoff_total - custo_inicial
+        # soma ΔP como constante
+        payoff_dict[S] = payoff_total + custo_inicial
 
     return payoff_dict, custo_inicial
-
 
 
 def calcular_break_even(payoff_dict):
