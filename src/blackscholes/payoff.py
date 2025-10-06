@@ -1,76 +1,12 @@
 import matplotlib.pyplot as plt
 
+
+
 def payoff_com_premio(legs, S_range):
-    """
-    Calcula o payoff líquido de uma estrutura de opções usando prêmios já conhecidos.
-
-    Args:
-        legs (list[dict]): Lista de dicts com os campos:
-            - tipo: "call" ou "put"
-            - strike: preço de exercício
-            - premio: valor do prêmio (positivo)
-            - sentido: "C" para compra (paga prêmio), "V" para venda (recebe prêmio)
-            - qtd (opcional): quantidade de contratos (default = 1)
-        S_range (list ou np.array): preços simulados do ativo no vencimento
-
-    Returns:
-        dict: {preço_subjacente: payoff_liquido}
-    """
-
-    # Cálculo do custo inicial da estrutura
-    custo_inicial = 0
-    for leg in legs:
-        premio = leg["premio"]
-        qtd = leg.get("qtd", 1)  # default 1 se não informado
-        sentido = leg["sentido"]
-
-        if sentido == "C":  # Compra = paga prêmio
-            custo_inicial += premio * qtd
-        elif sentido == "V":  # Venda = recebe prêmio
-            custo_inicial -= premio * qtd
-        else:
-            raise ValueError("Sentido deve ser 'C' (compra) ou 'V' (venda)")
-
-    # Calcular payoff líquido em cada ponto do S_range
-    payoff_dict = {}
-
-    for S_final in S_range:
-        payoff_total = 0
-        for leg in legs:
-            tipo = leg["tipo"]
-            strike = leg["strike"]
-            qtd = leg.get("qtd", 1)
-            sentido = leg["sentido"]
-
-            # Payoff bruto por tipo
-            if tipo == "call":
-                payoff_leg = max(S_final - strike, 0)
-            elif tipo == "put":
-                payoff_leg = max(strike - S_final, 0)
-            else:
-                raise ValueError("Tipo deve ser 'call' ou 'put'")
-
-            # Multiplicar pela quantidade
-            payoff_leg *= qtd
-
-            # Se for venda, inverte o sinal
-            if sentido == "V":
-                payoff_leg = -payoff_leg
-
-            payoff_total += payoff_leg
-
-        # Lucro líquido = payoff bruto - custo inicial
-        payoff_dict[S_final] = payoff_total - custo_inicial
-
-    return payoff_dict
-
-
-
-def payoff_com_premio_new(legs, S_range):
     """
     Args:
         legs: lista de dicionários com as pernas, ex:
-            {"tipo": "ativo", "ativo_adjacente": 100, "sentido": "C", "qtd": 1}
+            {"tipo": "ativo_adjacente", "premio": 100, "sentido": "C", "qtd": 1}
             {"tipo": "put", "strike": 100, "premio": 10, "sentido": "C", "qtd": 1}
             {"tipo": "call", "strike": 110, "premio": 10, "sentido": "V", "qtd": 1}
         S_range: lista de preços do ativo no vencimento (ex: range(70, 140, 5))
@@ -101,8 +37,8 @@ def payoff_com_premio_new(legs, S_range):
             tipo = leg["tipo"]
             sentido = leg["sentido"]
 
-            if tipo == "ativo":
-                S0 = leg["ativo_adjacente"]
+            if tipo == "ativo_adjacente":
+                S0 = leg["premio"]
                 payoff_leg = (S - S0) * qtd
                 if sentido == "V":
                     payoff_leg = -payoff_leg
@@ -120,7 +56,7 @@ def payoff_com_premio_new(legs, S_range):
                     payoff_leg = -payoff_leg
 
             else:
-                raise ValueError("Tipo deve ser 'ativo', 'put' ou 'call'")
+                raise ValueError("Tipo deve ser 'ativo_adjacente', 'put' ou 'call'")
 
             payoff_total += payoff_leg
 
@@ -237,7 +173,7 @@ def calcular_estrutura_api(legs, S_range):
     """
     nome = identificar_estrutura(legs)
 
-    payoff_dict, custo_inicial = payoff_com_premio_new(legs, S_range)
+    payoff_dict, custo_inicial = payoff_com_premio(legs, S_range)
     break_evens = calcular_break_even(payoff_dict)
 
     return {
